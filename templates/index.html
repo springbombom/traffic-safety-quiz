@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}검사 시작{% endblock %}
+{% block content %}
+<section class="card start-card">
+  <div class="main-brand-row">
+    <div class="eyebrow">교통안전교육</div>
+    <div class="agency-brand">
+      <img src="{{ url_for('static', filename='images/koroad-ci.png') }}" alt="한국도로교통공단 KOROAD">
+    </div>
+  </div>
+  <h1>음주운전 성향검사</h1>
+  <p class="lead">먼저 본인의 좌석 번호를 입력해 주세요.</p>
+  {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="{{ url_for('start') }}">
+    <input type="hidden" name="room_code" value="{{ classroom.code if classroom else '' }}">
+    <label for="respondent_code" class="seat-label">내 좌석 번호</label>
+    <input id="respondent_code" class="seat-input" name="respondent_code" maxlength="40" required autocomplete="off" inputmode="numeric" placeholder="예: 12번">
+
+    <fieldset class="test-picker">
+      <legend>아래에서 검사 하나를 눌러 주세요</legend>
+      <div class="test-buttons">
+        <button class="test-start q1-start" type="submit" name="test_id" value="drinking-driving-tendency-q1" {% if not classroom %}disabled{% endif %}>
+          <span class="direction">왼쪽 검사</span>
+          <strong>Q1</strong>
+          <span>19개 질문</span>
+          <span class="start-word">눌러서 시작하기</span>
+        </button>
+        <button class="test-start q2-start" type="submit" name="test_id" value="drinking-driving-tendency-q2" {% if not classroom %}disabled{% endif %}>
+          <span class="direction">오른쪽 검사</span>
+          <strong>Q2</strong>
+          <span>30개 질문</span>
+          <span class="start-word">눌러서 시작하기</span>
+        </button>
+      </div>
+    </fieldset>
+  </form>
+  <p class="privacy">이름은 입력하지 않습니다. 좌석 번호와 응답만 교수 PC에 저장됩니다.</p>
+  <a class="admin-link" href="{{ url_for('admin_login') }}">교수 관리자 화면</a>
+</section>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}교육장 설정{% endblock %}
+{% block content %}
+<section class="card settings-card">
+  <div class="eyebrow">교육장 설정</div>
+  <h1>{{ classroom.name }}</h1>
+  <p class="room-url">교육장 접속코드: <strong>{{ classroom.code }}</strong></p>
+  {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+  {% if success %}<div class="success-message" role="status">{{ success }}</div>{% endif %}
+  <form method="post">
+    {% if not session.get('admin_ok') %}
+    <label for="currentPin">현재 관리자 번호</label>
+    <input id="currentPin" name="current_pin" type="password" inputmode="numeric" required>
+    {% endif %}
+    <label for="newPin">새 관리자 번호</label>
+    <input id="newPin" name="new_pin" type="password" inputmode="numeric" minlength="4" maxlength="8" required placeholder="4~8자리 숫자">
+    <label for="confirmPin">새 관리자 번호 다시 입력</label>
+    <input id="confirmPin" name="confirm_pin" type="password" inputmode="numeric" minlength="4" maxlength="8" required>
+    <button class="primary giant" type="submit">관리자 번호 변경</button>
+  </form>
+  <a class="back button-link settings-back" href="{{ url_for('admin', room_id=classroom.id) }}">관리자 화면으로 돌아가기</a>
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ test.name }}{% endblock %}
+{% block content %}
+<div id="quizApp" data-attempt-id="{{ attempt.id }}">
+  <header class="quiz-header">
+    <div>
+      <div class="eyebrow">{{ test.name }}</div>
+      <h1 id="counter">1 / {{ test.questions|length }}</h1>
+    </div>
+    <div class="speed-control">
+      <span>음성 속도</span>
+      <button type="button" class="speed active" data-rate="normal">보통</button>
+      <button type="button" class="speed" data-rate="slow">천천히</button>
+    </div>
+  </header>
+  <div class="progress" aria-label="진행률"><div id="progressBar"></div></div>
+  <section class="card question-card">
+    <div id="questionNumber" class="question-number"></div>
+    <h2 id="questionText"></h2>
+    <div class="audio-actions">
+      <button type="button" id="listenButton" class="secondary">🔊 질문 듣기</button>
+      <button type="button" id="repeatButton" class="secondary">🔁 다시 듣기</button>
+      <button type="button" id="choicesListenButton" class="choices-listen">🔊 답안 모두 듣기</button>
+      <button type="button" id="helpButton" class="help">💡 질문의 뜻 다시 듣기</button>
+    </div>
+    <div id="message" class="message" role="status" aria-live="polite"></div>
+    <div id="choices" class="choices"></div>
+    <nav class="navigation">
+      <button type="button" id="prevButton" class="back">이전 문항</button>
+      <button type="button" id="nextButton" class="primary">다음 문항</button>
+    </nav>
+  </section>
+</div>
+<script>window.QUIZ_DATA = {{ test|tojson }};</script>
+<script src="{{ url_for('static', filename='js/speech.js') }}"></script>
+<script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
+{% endblock %}

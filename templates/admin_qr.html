@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}교육생 접속 QR코드{% endblock %}
+{% block content %}
+<section class="card qr-page">
+  <div class="eyebrow">교육생 접속용</div>
+  <h1>강의방 QR코드</h1>
+  <h2>{{ classroom.name }}</h2>
+  <p class="lead">교육생에게 아래 QR코드를 보여주세요.</p>
+  <img class="qr-large" src="{{ url_for('classroom_qr', classroom_id=classroom.id) }}" alt="{{ classroom.name }} 교육생 접속 QR코드">
+  <p class="qr-room-code">강의방 코드 <strong>{{ classroom.code }}</strong></p>
+  <p class="room-url">{{ room_url }}</p>
+  <div class="qr-page-actions">
+    <a class="primary button-link" href="{{ url_for('classroom_qr', classroom_id=classroom.id) }}" download>QR코드 이미지 저장</a>
+    <button class="secondary" type="button" onclick="window.print()">화면 인쇄</button>
+    <a class="back button-link" href="{{ url_for('admin', room_id=classroom.id) }}">관리자 화면으로</a>
+  </div>
+</section>
+{% endblock %}

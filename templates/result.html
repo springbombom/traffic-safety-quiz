@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}검사 완료{% endblock %}
+{% block content %}
+<section class="card completion">
+  <div class="complete-icon">✓</div>
+  <h1>검사가 완료되었습니다.</h1>
+  <p>응답이 교수 PC에 안전하게 저장되었습니다.</p>
+  <p class="muted">좌석 번호: {{ attempt.respondent_code }}</p>
+  {% if category_results %}
+  <div class="q1-score-area" role="status" aria-label="항목별 합산 점수">
+    <h2>{{ attempt.test_name }} 항목별 합산 점수</h2>
+    {% for category in category_results %}
+    <div class="category-score">
+      <span><b>{{ category.code }}</b> {{ category.name }}</span><strong>{{ category.score }}점</strong>
+    </div>
+    {% endfor %}
+    <small>원본 질문지의 흰색 분류 칸과 문항별 채점 방향에 따라 합산한 값입니다.</small>
+  </div>
+  {% endif %}
+  <a href="{{ url_for('index') }}" class="primary button-link">처음 화면으로</a>
+</section>
+<script src="{{ url_for('static', filename='js/speech.js') }}"></script>
+<script>window.addEventListener('load', () => SpeechGuide.speak('검사가 완료되었습니다.'));</script>
+{% endblock %}

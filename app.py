@@ -23,7 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("QUIZ_DATA_DIR", BASE_DIR / "data")).resolve()
 TTS_DIR = DATA_DIR / "tts_cache"
 DB_PATH = DATA_DIR / "results.db"
-QUESTIONS_PATH = DATA_DIR / "questions.json"
+# 질문 원본은 배포 파일에 포함하고, 응답 DB만 영구 저장공간으로 분리합니다.
+QUESTIONS_PATH = BASE_DIR / "data" / "questions.json"
 TTS_LOCK = threading.Lock()
 
 app = Flask(__name__)

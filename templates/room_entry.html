@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}교육장 접속{% endblock %}
+{% block content %}
+<section class="card start-card room-entry-card">
+  <div class="main-brand-row"><div class="eyebrow">교통안전교육</div><div class="agency-brand"><img src="{{ url_for('static', filename='images/koroad-ci.png') }}" alt="한국도로교통공단 KOROAD"></div></div>
+  <h1>음주운전 성향검사</h1>
+  <p class="lead qr-guide-line">교수가 보여주는 QR코드를 촬영해 접속해 주세요.</p>
+  <div class="or-divider"><span>또는</span></div>
+  {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="{{ url_for('join_room') }}">
+    <label for="room_code">교육장 접속코드</label>
+    <input id="room_code" class="room-code-input" name="room_code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" required autocomplete="off" placeholder="숫자 6자리">
+    <button class="primary giant" type="submit">교육장 입장</button>
+  </form>
+  <p class="privacy">교육장마다 접속코드가 다릅니다. 교수가 안내한 코드를 입력해 주세요.</p>
+  <a class="admin-link" href="{{ url_for('admin_login') }}">교수 관리자 화면</a>
+</section>
+{% endblock %}

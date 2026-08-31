@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}교수 로그인{% endblock %}
+{% block content %}
+<section class="card start-card">
+  <div class="eyebrow">교수 전용</div><h1>관리자 로그인</h1>
+  {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+  <form method="post">
+    <label for="room_id">관리할 교육장 선택</label>
+    <select id="room_id" name="room_id">
+      <option value="">전체 강의방 관리 (총괄 관리자)</option>
+      {% for room in classrooms %}
+      <option value="{{ room.id }}">{{ room.name }} · {{ room.code }} · {{ '접속 가능' if room.active else '종료됨' }}</option>
+      {% endfor %}
+    </select>
+    <label for="pin">관리자 번호</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" required autofocus>
+    <button class="primary giant" type="submit">로그인</button>
+  </form>
+  <a class="admin-link" href="{{ url_for('index') }}">교육생 화면으로 돌아가기</a>
+</section>
+{% endblock %}
