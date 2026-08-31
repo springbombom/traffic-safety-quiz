@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+offline_packages/
+work/
+vendor/
+data/results.db
+data/tts_cache/
+.env

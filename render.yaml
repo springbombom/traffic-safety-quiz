@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: drunk-driving-checklist
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: QUIZ_SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PIN
+        sync: false
+      - key: QUIZ_DATA_DIR
+        value: /app/data
+    disk:
+      name: quiz-results
+      mountPath: /app/data
+      sizeGB: 1
