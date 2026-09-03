@@ -1,5 +1,5 @@
 Flask==3.1.2
 waitress==3.0.2
 openpyxl==3.1.5
-pyttsx3==2.99
+edge-tts==7.2.8
 qrcode[pil]==8.2
