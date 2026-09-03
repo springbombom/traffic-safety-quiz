@@ -1,68 +1,106 @@
 (function () {
   let rateMode = 'normal';
-  let activeUtterance = null;
+  let audio = null;
+  let requestId = 0;
 
-  function speak(text) {
-    const message = document.getElementById('message');
-
-    if (!('speechSynthesis' in window)) {
-      if (message) {
-        message.textContent = '이 브라우저에서는 음성을 지원하지 않습니다.';
-      }
-      return;
+  function stopAudio() {
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio = null;
     }
+  }
 
-    // 현재 읽고 있는 음성을 먼저 중단합니다.
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ko-KR';
-    utterance.rate = rateMode === 'slow' ? 0.72 : 0.9;
-
-    // 휴대전화에 설치된 한국어 음성을 선택합니다.
-    const voices = window.speechSynthesis.getVoices();
-    const koreanVoice = voices.find(
-      voice =>
-        voice.lang &&
-        voice.lang.toLowerCase().startsWith('ko')
-    );
-
-    if (koreanVoice) {
-      utterance.voice = koreanVoice;
-    }
-
-    activeUtterance = utterance;
-
-    utterance.onend = () => {
-      if (activeUtterance === utterance) {
-        activeUtterance = null;
-      }
-    };
-
-    utterance.onerror = event => {
-      // 음성 교체 과정에서 발생하는 정상적인 중단은 무시합니다.
-      if (
-        event.error === 'canceled' ||
-        event.error === 'interrupted'
-      ) {
+  function localBrowserSpeak(text, id) {
+    return new Promise((resolve, reject) => {
+      if (!('speechSynthesis' in window)) {
+        reject(new Error('unsupported'));
         return;
       }
 
-      if (message) {
-        message.textContent =
-          '음성을 재생하지 못했습니다. 질문 듣기 버튼을 다시 눌러 주세요.';
-      }
-    };
+      stopAudio();
+      window.speechSynthesis.cancel();
 
-    window.speechSynthesis.speak(utterance);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ko-KR';
+      utterance.rate = rateMode === 'slow' ? 0.72 : 0.9;
+
+      const voices = window.speechSynthesis.getVoices();
+      const koreanVoice = voices.find(
+        voice =>
+          voice.lang &&
+          voice.lang.toLowerCase().startsWith('ko')
+      );
+
+      if (koreanVoice) {
+        utterance.voice = koreanVoice;
+      }
+
+      utterance.onend = resolve;
+
+      utterance.onerror = event => {
+        if (
+          id !== requestId ||
+          event.error === 'canceled' ||
+          event.error === 'interrupted'
+        ) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(event.error || 'speech-error'));
+      };
+
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
+  async function serverSpeak(text, id) {
+    if (id !== requestId) {
+      return;
+    }
+
+    stopAudio();
+
+    const nextAudio = new Audio(
+      `/api/tts?rate=${encodeURIComponent(rateMode)}&text=${encodeURIComponent(text)}`
+    );
+
+    audio = nextAudio;
+    await nextAudio.play();
+  }
+
+  async function speak(text) {
+    const id = ++requestId;
+
+    try {
+      await localBrowserSpeak(text, id);
+    } catch (_) {
+      if (id !== requestId) {
+        return;
+      }
+
+      try {
+        await serverSpeak(text, id);
+      } catch (_) {
+        const message = document.getElementById('message');
+
+        if (message) {
+          message.textContent =
+            '음성을 재생하지 못했습니다. 다시 눌러 주세요.';
+        }
+      }
+    }
   }
 
   function stop() {
+    requestId += 1;
+
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
 
-    activeUtterance = null;
+    stopAudio();
   }
 
   window.SpeechGuide = {
