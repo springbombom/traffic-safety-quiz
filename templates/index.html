@@ -14,7 +14,7 @@
   <form method="post" action="{{ url_for('start') }}">
     <input type="hidden" name="room_code" value="{{ classroom.code if classroom else '' }}">
     <label for="respondent_code" class="seat-label">내 좌석 번호</label>
-    <input id="respondent_code" class="seat-input" name="respondent_code" maxlength="40" required autocomplete="off" inputmode="numeric" placeholder="예: 12번">
+   <input id="respondent_code" class="seat-input" name="respondent_code" maxlength="40" pattern="[0-9]+" required autocomplete="off" inputmode="numeric" placeholder="예: 12">
 
     <fieldset class="test-picker">
       <legend>아래에서 검사 하나를 눌러 주세요</legend>
