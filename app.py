@@ -575,38 +575,54 @@ def export_xlsx():
     workbook.save(stream)
     stream.seek(0)
     return send_file(stream, as_attachment=True, download_name="traffic_safety_results.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-
 @app.get("/api/tts")
 def tts():
     text = request.args.get("text", "").strip()
     rate = request.args.get("rate", "normal")
+
     if not text or len(text) > 500:
         return jsonify(error="읽을 문장이 없습니다."), 400
+
+    import asyncio
     import hashlib
-    key = hashlib.sha256(f"{rate}|{text}".encode("utf-8")).hexdigest()
-    path = TTS_DIR / f"{key}.wav"
+    import edge_tts
+
+    key = hashlib.sha256(
+        f"{rate}|{text}".encode("utf-8")
+    ).hexdigest()
+
+    path = TTS_DIR / f"{key}.mp3"
+
     if not path.exists():
         try:
-            import pyttsx3
             with TTS_LOCK:
                 if not path.exists():
-                    engine = pyttsx3.init()
-                    voices = engine.getProperty("voices")
-                    korean = next((v for v in voices if "ko" in str(getattr(v, "languages", "")).lower() or "korean" in v.name.lower() or "heami" in v.name.lower()), None)
-                    if korean:
-                        engine.setProperty("voice", korean.id)
-                    engine.setProperty("rate", 135 if rate == "slow" else 165)
-                    engine.save_to_file(text, str(path))
-                    engine.runAndWait()
-                    engine.stop()
+                    speed = "-25%" if rate == "slow" else "-10%"
+
+                    async def create_audio():
+                        communicate = edge_tts.Communicate(
+                            text=text,
+                            voice="ko-KR-SunHiNeural",
+                            rate=speed,
+                        )
+                        await communicate.save(str(path))
+
+                    asyncio.run(create_audio())
+
         except Exception as exc:
-            return jsonify(error="교수 PC의 오프라인 음성을 만들 수 없습니다.", detail=str(exc)), 503
+            return jsonify(
+                error="음성을 만들 수 없습니다.",
+                detail=str(exc),
+            ), 503
+
     if not path.exists() or path.stat().st_size == 0:
         return jsonify(error="음성 파일을 만들 수 없습니다."), 503
-    return send_file(path, mimetype="audio/wav", conditional=True)
 
-
+    return send_file(
+        path,
+        mimetype="audio/mpeg",
+        conditional=True,
+    )
 @app.get("/health")
 def health():
     return jsonify(ok=True, time=now_iso())
