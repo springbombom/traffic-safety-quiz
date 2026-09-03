@@ -82,5 +82,4 @@
     } catch (error) { els.next.disabled = false; els.message.textContent = error.message; SpeechGuide.speak(error.message); }
   });
   render();
-  window.addEventListener('load', () => SpeechGuide.speak(`지금부터 ${window.QUIZ_DATA.name}를 시작합니다.`));
 })();
