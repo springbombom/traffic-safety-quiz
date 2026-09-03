@@ -4,6 +4,11 @@
 
   function localBrowserSpeak(text) {
     return new Promise((resolve, reject) => {
+       if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio = null;
+    }
       if (!('speechSynthesis' in window)) return reject(new Error('unsupported'));
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -13,7 +18,14 @@
       const korean = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('ko'));
       if (korean) utterance.voice = korean;
       utterance.onend = resolve;
-      utterance.onerror = reject;
+     utterance.onerror = (event) => {
+  if (event.error === 'canceled' || event.error === 'interrupted') {
+    resolve();
+    return;
+  }
+
+  reject(new Error(event.error || 'speech-error'));
+};
       window.speechSynthesis.speak(utterance);
     });
   }
