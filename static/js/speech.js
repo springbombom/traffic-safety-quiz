@@ -37,16 +37,17 @@
   }
 
   async function speak(text) {
-    try {
-      await localBrowserSpeak(text);
-    } catch (_) {
-      try { await serverSpeak(text); }
-      catch (_) {
-        const message = document.getElementById('message');
-        if (message) message.textContent = '음성 기능을 사용할 수 없습니다. 화면의 질문을 확인해 주세요.';
-      }
+  try {
+    await localBrowserSpeak(text);
+  } catch (_) {
+    const message = document.getElementById('message');
+
+    if (message) {
+      message.textContent =
+        '이 브라우저에서는 음성을 재생할 수 없습니다. Chrome 또는 Safari에서 열어 주세요.';
     }
   }
+}
 
   window.SpeechGuide = {
     speak,
