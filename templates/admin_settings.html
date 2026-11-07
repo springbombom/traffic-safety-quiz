@@ -10,7 +10,7 @@
   <form method="post">
     {% if not session.get('admin_ok') %}
     <label for="currentPin">현재 관리자 번호</label>
-    <input id="currentPin" name="current_pin" type="password" inputmode="numeric" required>
+    <input id="currentPin" name="current_pin" type="password" autocomplete="current-password" autocapitalize="none" required>
     {% endif %}
     <label for="newPin">새 관리자 번호</label>
     <input id="newPin" name="new_pin" type="password" inputmode="numeric" minlength="4" maxlength="8" required placeholder="4~8자리 숫자">
