@@ -1,18 +1,19 @@
 import csv
 from copy import copy
+import hashlib
 import io
 import json
 import os
 import secrets
 import socket
 import sqlite3
-import subprocess
 import tempfile
 import threading
 from datetime import datetime
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
+from zipfile import ZipFile
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -24,6 +25,8 @@ from flask import (
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("QUIZ_DATA_DIR", BASE_DIR / "data")).resolve()
 TTS_DIR = DATA_DIR / "tts_cache"
+SPEECH_ARCHIVE = BASE_DIR / "speech_audio.zip"
+SPEECH_VOICE = "ko-KR-SunHiNeural"
 DB_PATH = DATA_DIR / "results.db"
 # 질문 원본은 배포 파일에 포함하고, 응답 DB만 영구 저장공간으로 분리합니다.
 QUESTIONS_PATH = BASE_DIR / "data" / "questions.json"
@@ -577,6 +580,10 @@ def export_xlsx():
     workbook.save(stream)
     stream.seek(0)
     return send_file(stream, as_attachment=True, download_name="traffic_safety_results.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+def speech_key(text, rate):
+    return hashlib.sha256(f"neural-v1|{SPEECH_VOICE}|{rate}|{text}".encode("utf-8")).hexdigest()
+
+
 @app.get("/api/tts")
 def tts():
     text = request.args.get("text", "").strip()
@@ -586,19 +593,19 @@ def tts():
         return jsonify(error="읽을 문장이 없습니다."), 400
 
     import asyncio
-    import hashlib
-
-    key = hashlib.sha256(
-        f"{rate}|{text}".encode("utf-8")
-    ).hexdigest()
-
+    key = speech_key(text, rate)
+    try:
+        with ZipFile(SPEECH_ARCHIVE) as archive:
+            audio = archive.read(f"{key}.mp3")
+        return send_file(io.BytesIO(audio), mimetype="audio/mpeg",
+                         download_name=f"{key}.mp3", conditional=True, etag=key)
+    except (FileNotFoundError, KeyError):
+        pass
     mp3_path = TTS_DIR / f"{key}.mp3"
-    wav_path = TTS_DIR / f"{key}.wav"
 
     def cached_audio():
-        for candidate, mimetype in ((mp3_path, "audio/mpeg"), (wav_path, "audio/wav")):
-            if candidate.exists() and candidate.stat().st_size > 44:
-                return send_file(candidate, mimetype=mimetype, conditional=True)
+        if mp3_path.exists() and mp3_path.stat().st_size > 44:
+            return send_file(mp3_path, mimetype="audio/mpeg", conditional=True)
         return None
 
     cached = cached_audio()
@@ -616,7 +623,7 @@ def tts():
 
                 async def create_audio():
                     communicate = edge_tts.Communicate(
-                        text=text, voice="ko-KR-SunHiNeural",
+                        text=text, voice=SPEECH_VOICE,
                         rate="-25%" if rate == "slow" else "-10%",
                     )
                     await asyncio.wait_for(communicate.save(str(pending)), timeout=8)
@@ -626,20 +633,8 @@ def tts():
                     raise OSError("Empty MP3 speech")
                 pending.replace(mp3_path)
             except Exception:
-                app.logger.warning("Online speech unavailable, using local Korean speech")
-                pending = Path(directory) / "speech.wav"
-                try:
-                    subprocess.run(
-                        ["espeak-ng", "-v", "ko", "-s", "135" if rate == "slow" else "165",
-                         "-b", "1", "-w", str(pending), "--stdin"],
-                        input=text.encode("utf-8"), capture_output=True, check=True, timeout=10,
-                    )
-                    if not pending.exists() or pending.stat().st_size <= 44:
-                        raise OSError("Empty WAV speech")
-                    pending.replace(wav_path)
-                except (OSError, subprocess.SubprocessError):
-                    app.logger.exception("Local Korean speech failed")
-                    return jsonify(error="음성 파일을 만들 수 없습니다."), 503
+                app.logger.exception("Neural speech generation failed")
+                return jsonify(error="음성 파일을 만들 수 없습니다."), 503
     return cached_audio()
 @app.get("/health")
 def health():
