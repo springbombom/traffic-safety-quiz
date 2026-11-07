@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim-trixie
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -7,7 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends espeak-ng libespeak1 \
+    && apt-get install -y --no-install-recommends espeak-ng \
+    && espeak-ng -v ko -w /tmp/korean.wav '질문입니다.' \
+    && test -s /tmp/korean.wav && rm -f /tmp/korean.wav \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

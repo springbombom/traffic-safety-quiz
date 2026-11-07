@@ -6,6 +6,8 @@ import os
 import secrets
 import socket
 import sqlite3
+import subprocess
+import tempfile
 import threading
 from datetime import datetime
 from contextlib import contextmanager
@@ -578,51 +580,67 @@ def export_xlsx():
 @app.get("/api/tts")
 def tts():
     text = request.args.get("text", "").strip()
-    rate = request.args.get("rate", "normal")
+    rate = "slow" if request.args.get("rate") == "slow" else "normal"
 
     if not text or len(text) > 500:
         return jsonify(error="읽을 문장이 없습니다."), 400
 
     import asyncio
     import hashlib
-    import edge_tts
 
     key = hashlib.sha256(
         f"{rate}|{text}".encode("utf-8")
     ).hexdigest()
 
-    path = TTS_DIR / f"{key}.mp3"
+    mp3_path = TTS_DIR / f"{key}.mp3"
+    wav_path = TTS_DIR / f"{key}.wav"
 
-    if not path.exists():
-        try:
-            with TTS_LOCK:
-                if not path.exists():
-                    speed = "-25%" if rate == "slow" else "-10%"
+    def cached_audio():
+        for candidate, mimetype in ((mp3_path, "audio/mpeg"), (wav_path, "audio/wav")):
+            if candidate.exists() and candidate.stat().st_size > 44:
+                return send_file(candidate, mimetype=mimetype, conditional=True)
+        return None
 
-                    async def create_audio():
-                        communicate = edge_tts.Communicate(
-                            text=text,
-                            voice="ko-KR-SunHiNeural",
-                            rate=speed,
-                        )
-                        await communicate.save(str(path))
+    cached = cached_audio()
+    if cached is not None:
+        return cached
 
-                    asyncio.run(create_audio())
+    with TTS_LOCK:
+        cached = cached_audio()
+        if cached is not None:
+            return cached
+        with tempfile.TemporaryDirectory(dir=TTS_DIR) as directory:
+            pending = Path(directory) / "speech.mp3"
+            try:
+                import edge_tts
 
-        except Exception as exc:
-            return jsonify(
-                error="음성을 만들 수 없습니다.",
-                detail=str(exc),
-            ), 503
+                async def create_audio():
+                    communicate = edge_tts.Communicate(
+                        text=text, voice="ko-KR-SunHiNeural",
+                        rate="-25%" if rate == "slow" else "-10%",
+                    )
+                    await asyncio.wait_for(communicate.save(str(pending)), timeout=8)
 
-    if not path.exists() or path.stat().st_size == 0:
-        return jsonify(error="음성 파일을 만들 수 없습니다."), 503
-
-    return send_file(
-        path,
-        mimetype="audio/mpeg",
-        conditional=True,
-    )
+                asyncio.run(create_audio())
+                if not pending.exists() or pending.stat().st_size <= 44:
+                    raise OSError("Empty MP3 speech")
+                pending.replace(mp3_path)
+            except Exception:
+                app.logger.warning("Online speech unavailable, using local Korean speech")
+                pending = Path(directory) / "speech.wav"
+                try:
+                    subprocess.run(
+                        ["espeak-ng", "-v", "ko", "-s", "135" if rate == "slow" else "165",
+                         "-b", "1", "-w", str(pending), "--stdin"],
+                        input=text.encode("utf-8"), capture_output=True, check=True, timeout=10,
+                    )
+                    if not pending.exists() or pending.stat().st_size <= 44:
+                        raise OSError("Empty WAV speech")
+                    pending.replace(wav_path)
+                except (OSError, subprocess.SubprocessError):
+                    app.logger.exception("Local Korean speech failed")
+                    return jsonify(error="음성 파일을 만들 수 없습니다."), 503
+    return cached_audio()
 @app.get("/health")
 def health():
     return jsonify(ok=True, time=now_iso())
