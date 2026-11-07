@@ -32,6 +32,6 @@
   </section>
 </div>
 <script>window.QUIZ_DATA = {{ test|tojson }};</script>
-<script src="{{ url_for('static', filename='js/speech.js') }}"></script>
+<script src="{{ url_for('static', filename='js/speech.js', v='neural-v1') }}"></script>
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
 {% endblock %}
