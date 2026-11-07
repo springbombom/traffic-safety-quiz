@@ -6,12 +6,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends espeak-ng \
-    && espeak-ng -v ko -w /tmp/korean.wav '질문입니다.' \
-    && test -s /tmp/korean.wav && rm -f /tmp/korean.wav \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
