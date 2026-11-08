@@ -72,7 +72,7 @@ def get_db():
 
 
 def init_db():
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     TTS_DIR.mkdir(exist_ok=True)
     with get_db() as db:
         db.executescript("""
@@ -111,27 +111,32 @@ def init_db():
             FOREIGN KEY(attempt_id) REFERENCES attempts(id) ON DELETE CASCADE
         );
         """)
+        db.execute("BEGIN IMMEDIATE")
         columns = {row["name"] for row in db.execute("PRAGMA table_info(attempts)")}
         if "classroom_id" not in columns:
             db.execute("ALTER TABLE attempts ADD COLUMN classroom_id INTEGER")
         room_columns = {row["name"] for row in db.execute("PRAGMA table_info(classrooms)")}
         if "admin_pin_hash" not in room_columns:
             db.execute("ALTER TABLE classrooms ADD COLUMN admin_pin_hash TEXT")
-        legacy_initialized = db.execute("SELECT value FROM app_settings WHERE key = 'legacy_room_initialized'").fetchone()
-        default_room = db.execute("SELECT id FROM classrooms WHERE code = 'EXISTING'").fetchone()
-        if not legacy_initialized:
-            if not default_room:
-                cursor = db.execute(
-                    "INSERT INTO classrooms (name, code, created_at, active) VALUES (?, ?, ?, 1)",
-                    ("기존 강의방", "EXISTING", now_iso()),
-                )
-                default_room_id = cursor.lastrowid
-            else:
-                default_room_id = default_room["id"]
-            db.execute("INSERT INTO app_settings (key, value) VALUES ('legacy_room_initialized', '1')")
-        else:
-            default_room_id = default_room["id"] if default_room else None
+        legacy_room = db.execute("""
+            SELECT id, code FROM classrooms
+            WHERE code = 'EXISTING' OR id = (
+                SELECT value FROM app_settings WHERE key = 'legacy_room_id'
+            )
+            ORDER BY code = 'EXISTING' DESC LIMIT 1
+        """).fetchone()
+        default_room_id = legacy_room["id"] if legacy_room else None
+        if legacy_room and legacy_room["code"] == "EXISTING":
+            db.execute("UPDATE classrooms SET code = ? WHERE id = ?",
+                       (new_room_code(db), default_room_id))
+        if not legacy_room and db.execute("SELECT 1 FROM attempts WHERE classroom_id IS NULL LIMIT 1").fetchone():
+            default_room_id = db.execute(
+                "INSERT INTO classrooms (name, code, created_at, active) VALUES (?, ?, ?, 1)",
+                ("기존 강의방", new_room_code(db), now_iso()),
+            ).lastrowid
         if default_room_id is not None:
+            db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('legacy_room_id', ?)",
+                       (str(default_room_id),))
             db.execute("UPDATE attempts SET classroom_id = ? WHERE classroom_id IS NULL", (default_room_id,))
         default_hash = generate_password_hash(os.environ.get("ADMIN_PIN", "1234"))
         db.execute("UPDATE classrooms SET admin_pin_hash = ? WHERE admin_pin_hash IS NULL OR admin_pin_hash = ''", (default_hash,))
@@ -175,11 +180,13 @@ def room_access_allowed(classroom_id):
 
 
 def get_classroom_by_code(code, active_only=True):
-    query = "SELECT * FROM classrooms WHERE code = ?"
+    query = """SELECT * FROM classrooms WHERE code = ? OR (
+        ? = 'EXISTING' AND id = (SELECT value FROM app_settings WHERE key = 'legacy_room_id')
+    )"""
     if active_only:
-        query += " AND active = 1"
+        query = f"SELECT * FROM ({query}) WHERE active = 1"
     with get_db() as db:
-        row = db.execute(query, (code,)).fetchone()
+        row = db.execute(query, (code, code)).fetchone()
     return dict(row) if row else None
 
 
@@ -388,11 +395,10 @@ def admin():
                            room_url=(f"http://{local_ip()}:5000/room/{selected['code']}" if selected else ""))
 
 
-def new_room_code():
+def new_room_code(db):
     while True:
         code = str(secrets.randbelow(900000) + 100000)
-        with get_db() as db:
-            exists = db.execute("SELECT 1 FROM classrooms WHERE code = ?", (code,)).fetchone()
+        exists = db.execute("SELECT 1 FROM classrooms WHERE code = ?", (code,)).fetchone()
         if not exists:
             return code
 
@@ -406,9 +412,11 @@ def create_classroom():
     admin_pin = request.form.get("admin_pin", "").strip()
     if not name or len(name) > 80 or not admin_pin.isdigit() or not 4 <= len(admin_pin) <= 8:
         return redirect(url_for("admin"))
+    pin_hash = generate_password_hash(admin_pin)
     with get_db() as db:
+        db.execute("BEGIN IMMEDIATE")
         cursor = db.execute("INSERT INTO classrooms (name, code, created_at, active, admin_pin_hash) VALUES (?, ?, ?, 1, ?)",
-                            (name, new_room_code(), now_iso(), generate_password_hash(admin_pin)))
+                            (name, new_room_code(db), now_iso(), pin_hash))
         room_id = cursor.lastrowid
     return redirect(url_for("admin", room_id=room_id))
 

@@ -16,6 +16,13 @@ class QuizFlowTest(unittest.TestCase):
         quiz_app.DB_PATH = Path(self.temp.name) / "test.db"
         quiz_app.app.config.update(TESTING=True, SECRET_KEY="test")
         quiz_app.init_db()
+        with quiz_app.get_db() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM classrooms").fetchone()[0], 0)
+            self.legacy_room_id = db.execute(
+                "INSERT INTO classrooms (name, code, created_at) VALUES (?, ?, ?)",
+                ("기존 강의방", "EXISTING", quiz_app.now_iso()),
+            ).lastrowid
+        quiz_app.init_db()
         self.client = quiz_app.app.test_client()
 
     def tearDown(self):
@@ -151,13 +158,18 @@ class QuizFlowTest(unittest.TestCase):
         with self.client.session_transaction() as session:
             session["admin_ok"] = True
         with quiz_app.get_db() as db:
-            legacy = db.execute("SELECT id FROM classrooms WHERE code = 'EXISTING'").fetchone()
-        self.assertIsNotNone(legacy)
-        self.client.post(f"/admin/classrooms/{legacy['id']}/delete")
+            legacy = db.execute("SELECT id, code FROM classrooms WHERE id = ?",
+                                (self.legacy_room_id,)).fetchone()
+        self.assertRegex(legacy["code"], r"^[0-9]{6}$")
+        self.assertEqual(self.client.post("/join", data={"room_code": legacy["code"]}).status_code, 302)
+        self.assertEqual(self.client.get("/room/EXISTING").status_code, 200)
+        quiz_app.init_db()
+        self.assertEqual(quiz_app.get_classroom_by_code("EXISTING")["code"], legacy["code"])
+        self.assertEqual(self.client.post(f"/admin/classrooms/{legacy['id']}/delete").status_code, 302)
         quiz_app.init_db()
         with quiz_app.get_db() as db:
-            recreated = db.execute("SELECT id FROM classrooms WHERE code = 'EXISTING'").fetchone()
-        self.assertIsNone(recreated)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM classrooms").fetchone()[0], 0)
+        self.assertEqual(self.client.get("/room/EXISTING").status_code, 404)
 
 
 if __name__ == "__main__":
